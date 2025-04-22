@@ -1,0 +1,255 @@
+#Numero de Pods
+replicaCount: 1
+####
+
+terminationGracePeriodSeconds: 50
+
+# Mudar para nome da aplicação ex: api-nome-composto ou worker-nome-composto
+nameDeployment: nome-da-aplicacao
+####
+
+#Versão do deployment
+version: v1
+####
+
+#Definicao da Imagem
+image:
+  repository: pcr.pmenos.com.br/ambiente/imagem
+####
+
+#Versionamento da Imagem dia.mes.ano.revisao, ex: 18.03.2020.1
+  tag: placeholder
+####
+
+#Politica de Pull da Imagem
+  pullPolicy: Always
+  debug: false
+####
+
+#Ativar/Desativar informacoes de gateways - Opcional
+gateway:
+  enabled: false
+  nameGateway: nome_da_gateway 
+####
+
+#Ativar/Desativar informacoes de hosts - Opcional
+hosts:
+  enabled: false
+  nameHost: nome_da_host
+####
+
+#Definição de URL para a API ou WORKER
+
+# URL BASE
+ # https://k8s.pmenos.com.br (Produção)
+ # https://k8sstg.pmenos.com.br (Staging)
+ # https://k8shomo.pmenos.com.br (Dev)
+  
+  #Obs.: rewrite para path local.
+
+virtualservice:
+   enabled: true
+   api:
+     url: /nomedaaplicacao/api
+     subset: v1
+   rewriteapi:
+     url: /api
+   canary:
+     enabled: true
+     url: /nomedaaplicacao/api
+     subset: canary
+   rewritecanary:
+     url: /api
+   swagger:
+     enabled: false
+     url: /apinomecomposto/api/swagger
+   rewriteswagger:
+     url: /api/swagger
+####
+
+#Ativar/Desativar headers utilizado com canary
+header:
+  enabled: true
+  v1:
+    enabled: true
+    exact: v1
+  cookieV1:
+    enabled: false
+    regex: (.*)?(version=cookieV1)(.*)?
+  canary:
+    enabled: true
+    exact: canary
+  cookieCanary:
+    enabled: false
+    regex: (.*)?(version=cookieCanary)(.*)?
+###
+
+#Ativar/Desativar canary label manualmente
+canarylabel:
+  enabled: false
+  name: nome_da_label
+###
+
+#Ativar/Desativar Configmap/Seleção de Ambiente no arquivo configmaps.yaml
+configmap:
+  enabled: true
+  env: prd  # valor modificado na execução da pipeline.
+####
+
+#Ativar/Desativar segundo Configmap Opcional
+configmap2:
+  enabled: false
+  name: nome_da_configmaps2
+####
+
+#Ativar/Desativar terceiro Configmap Opcional
+configmap3:
+  enabled: false
+  name: nome_da_configmaps3
+####
+
+#Definição do senhas usadas pela aplicação.
+secret:
+  enabled: false
+  name: mssqlserver-user-pass
+
+secret2:
+  enabled: false
+  name: nome_da_secret2
+
+secret3:
+  enabled: false
+  name: nome_da_secret3
+####
+
+#Agent Dynatrace
+agentdynatrace:
+  enabled: false
+####
+
+#Strategia de Update para deploy do pod
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 25%
+####
+
+# Habilitar o canary release e definir os pesos de cada versão
+# canary.enabled : bool
+# canary.stableWeight, canary.canaryWeight: int 
+canary:
+  enabled: true 
+  stableWeight: 100
+  canaryWeight: 0
+#########################
+
+# Veririficar se a aplicação iniciou corretamente antes de liberar tráfego
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /api/v2/PagueLeve/BuscarPagueLeveRegra?codigoProduto=15496&codigoMedalha=6&codigoFilial=100
+    port: 8080
+    scheme: HTTP
+  periodSeconds: 10
+  failureThreshold: 30
+#########################
+
+#HealthCheck do Pod enquanto Roda
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /api/health
+    port: 8080
+    scheme: HTTP 
+  initialDelaySeconds: 20
+  periodSeconds: 30
+  timeoutSeconds: 15
+  failureThreshold: 6
+  successThreshold: 1
+####
+
+#Health check para colocar o pod pronto para uso
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /api/health
+    port: 8080
+    scheme: HTTP
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 15
+  failureThreshold: 6
+  successThreshold: 1
+####
+
+#Segurança do Pod
+security:
+   enabled: false
+podSecurityContext:
+   fsGroup: 20000
+####
+
+securityContext:
+   enabled: false
+   allowPrivilegeEscalation: false
+   capabilities:
+     drop: ["all"]
+   runAsGroup: 20000
+   runAsNonRoot: true
+   runAsUser: 20000
+####
+
+#Tipo de Serviço e Porta 
+service:
+  enabled: true
+  type: ClusterIP
+  port: 8080
+####
+
+#Tipo de Serviço e Porta 
+containerPort:
+  enabled: false
+  port: 8080
+####
+
+#Definindo Requests e Limits para a Aplicação
+resources: 
+  limits:
+    cpu: 150m
+    memory: 500Mi
+  requests:
+    cpu: 100m
+    memory: 350Mi
+####
+
+#Configuracao de AutoScaling hpa
+autoscaling:
+  enabled: true
+  minReplicas: 5
+  maxReplicas: 45
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 60
+####
+
+tolerations:
+- key: node.kubernetes.io/not-ready
+  effect: NoExecute
+  tolerationSeconds: 30
+- key: node.kubernetes.io/unreachable
+  effect: NoExecute
+  tolerationSeconds: 30
+####
+
+#Para habilitar o affinity a quantidade de pods deve ser menor que a quantidade de Nodes.
+affinity:
+  enabled: false
+####
+
+nodeSelector: {}
+
+#imagePullSecrets: []
+# - registrySecretName
+#nameOverride: ""
+#fullnameOverride: ""
+#Seguranca do Pod no Kubernetes

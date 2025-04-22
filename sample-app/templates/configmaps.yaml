@@ -1,0 +1,20 @@
+{{- if .Values.configmap.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "{{ .Values.nameDeployment }}.name" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "{{ .Values.nameDeployment }}.labels" . | nindent 4 }}
+data:
+{{- if eq .Values.configmap.env "prd" }}
+  ASPNETCORE_ENVIRONMENT: "Production"
+  APPLICATION_NAME: "nomedaaplicacao"
+{{- else if eq .Values.configmap.env "stg" }}
+  ASPNETCORE_ENVIRONMENT: "Staging"
+  APPLICATION_NAME: "nomedaaplicacao"
+{{- else if eq .Values.configmap.env "dev" }}
+  ASPNETCORE_ENVIRONMENT: "Development"
+  APPLICATION_NAME: "nomedaaplicacao"
+{{- end }}
+{{- end }}

@@ -1,0 +1,177 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.nameDeployment }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+  {{- if .Values.canarylabel }}
+    {{- if .Values.canarylabel.enabled }}
+    app: {{ .Values.canarylabel.name }}
+    version: {{ .Values.version }}
+    {{ else }}
+    {{- include "{{ .Values.nameDeployment }}.labels" . | nindent 4 }}
+    {{- end }}
+  {{ else }}
+    {{- include "{{ .Values.nameDeployment }}.labels" . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: {{ .Values.updateStrategy.type }}
+    rollingUpdate:
+      maxSurge: {{ .Values.updateStrategy.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ .Values.updateStrategy.rollingUpdate.maxUnavailable }}
+  selector:
+    matchLabels:
+    {{- if .Values.canarylabel }}
+      {{- if .Values.canarylabel.enabled }}
+      app: {{ .Values.canarylabel.name }}
+      version: {{ .Values.version }}
+      {{ else }}
+      {{- include "{{ .Values.nameDeployment }}.labels" . | nindent 6 }}
+      {{- end }}
+    {{ else }}
+      {{- include "{{ .Values.nameDeployment }}.labels" . | nindent 6 }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+      {{- if .Values.canarylabel }}
+        {{- if .Values.canarylabel.enabled }}
+        app: {{ .Values.canarylabel.name }}
+        version: {{ .Values.version }}
+        {{ else }}
+        {{- include "{{ .Values.nameDeployment }}.labels" . | nindent 8 }}
+        {{- end }}
+      {{ else }}
+        {{- include "{{ .Values.nameDeployment }}.labels" . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- if .Values.affinity.enabled }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    {{- include "{{ .Values.nameDeployment }}.affinity" . | nindent 20}}
+              topologyKey: "kubernetes.io/hostname"
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.security.enabled }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ print .Values.image.repository ":" .Values.image.tag | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+            {{- if .Values.containerPort }}
+              {{- if .Values.containerPort.enabled }}
+              containerPort: {{ .Values.containerPort.port }}
+              {{ else }}
+              containerPort: {{ .Values.service.port }}
+              {{- end }}
+            {{ else }}
+              containerPort: {{ .Values.service.port }}
+            {{- end }}
+              protocol: TCP
+          {{- if or .Values.configmap.enabled .Values.secret.enabled }}
+          envFrom:
+          {{- if .Values.configmap.enabled }}
+          - configMapRef:
+              name: "{{ include "{{ .Values.nameDeployment }}.name" . }}"
+          {{- end }}
+          {{- if .Values.configmap2 }}
+          {{- if .Values.configmap2.enabled }}
+          - configMapRef:
+              name: "{{ .Values.configmap2.name }}"
+          {{- end }}
+          {{- end }}
+          {{- if .Values.configmap3 }}
+          {{- if .Values.configmap3.enabled }}
+          - configMapRef:
+              name: "{{ .Values.configmap3.name }}"
+          {{- end }}
+          {{- end }}
+          {{- if .Values.secret.enabled }}
+          - secretRef:
+              name: "{{ .Values.secret.name }}"
+          {{- end }}
+          {{- if .Values.secret2 }}
+          {{- if .Values.secret2.enabled }}
+          - secretRef:
+              name: "{{ .Values.secret2.name }}"
+          {{- end }}
+          {{- end }}
+          {{- if .Values.secret3}}
+          {{- if .Values.secret3.enabled }}
+          - secretRef:
+              name: "{{ .Values.secret3.name }}"
+          {{- end }}
+          {{- end }}          
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}    
+          startupProbe:
+            {{- toYaml .Values.startupProbe | replace "enabled: true" "" | trim | nindent 12 }}
+          {{- end }}
+          {{- if .Values.livenessProbe.enabled }}    
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | replace "enabled: true" "" | trim | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}    
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | replace "enabled: true" "" | trim | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | trim | nindent 12 }}
+          {{- if .Values.security.enabled }}
+          securityContext:
+            {{- toYaml .Values.securityContext | trim | nindent 12 }}
+          {{- end }}
+          {{- if .Values.agentdynatrace}}
+          {{- if .Values.agentdynatrace.enabled }}
+    # env OneAgent
+          env:
+          - name: LD_PRELOAD
+            value: /opt/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+          volumeMounts:
+          - mountPath: /opt/dynatrace/oneagent
+            name: oneagent
+    # initcontainer to download OneAgent
+      initContainers:
+      - name: install-oneagent
+        image: alpine:latest
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - ARCHIVE=$(mktemp) && wget -O $ARCHIVE "$DT_API_URL/v1/deployment/installer/agent/unix/paas/latest?Api-Token=$DT_PAAS_TOKEN&$DT_ONEAGENT_OPTIONS" && unzip -o -d /opt/dynatrace/oneagent $ARCHIVE && rm -f $ARCHIVE
+        envFrom:
+        - configMapRef:
+            name: dynatrace-one-agent
+        volumeMounts:
+        - mountPath: /opt/dynatrace/oneagent
+          name: oneagent
+    # Make OneAgent available as a volume
+      volumes:
+      - name: oneagent
+        emptyDir: {}
+          {{- end }}
+          {{- end }}  
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

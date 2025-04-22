@@ -1,0 +1,24 @@
+{{- if .Values.virtualservice.enabled -}}
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: {{ .Values.nameDeployment }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "{{ .Values.nameDeployment }}.labels" . | nindent 4 }}
+spec:
+  host: "{{ include "{{ .Values.nameDeployment }}.name" . }}.{{ .Release.Namespace }}.svc.cluster.local"
+  subsets:
+  - labels:
+      app: {{ include "{{ .Values.nameDeployment }}.name" . }}
+      version: {{ .Values.version | quote }}
+    name: {{ .Values.version | quote }}
+{{- if .Values.virtualservice.canary }}
+{{- if .Values.virtualservice.canary.enabled }}
+  - labels:
+      app: {{ include "{{ .Values.nameDeployment }}.name" . }}
+      version: {{ .Values.virtualservice.canary.subset | quote}}
+    name: {{ .Values.virtualservice.canary.subset | quote}}
+{{- end }}
+{{- end }}
+{{- end }}

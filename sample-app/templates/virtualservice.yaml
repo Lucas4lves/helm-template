@@ -1,0 +1,136 @@
+{{- if .Values.virtualservice.enabled -}}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ .Values.nameDeployment }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: {{ .Values.nameDeployment }}
+    version: v1
+spec:
+  hosts:
+  {{- if .Values.hosts }}
+    {{- if .Values.hosts.enabled }}
+    - {{ .Values.hosts.nameHost }}
+    {{ else }}
+    - "*"
+    {{- end }}
+  {{ else }}
+  - "*"
+  {{- end }}
+  gateways:
+  {{- if .Values.gateway }}
+    {{- if .Values.gateway.enabled }}
+    - {{ .Values.gateway.nameGateway }}
+    {{ else }}
+    - default/api-gateway
+    {{- end }}
+  {{ else }}
+  - default/api-gateway
+  {{- end }}
+  http:
+  - match:
+{{- if and .Values.header .Values.header.v1 .Values.header.cookieV1 }}
+  {{- if or .Values.header.v1.enabled .Values.header.cookieV1.enabled }}
+    - headers:
+    {{- if .Values.header.v1.enabled }}
+        x-api-version:
+          exact: {{ .Values.header.v1.exact }}
+    {{- end }}
+    {{- if .Values.header.cookieV1.enabled }}
+        cookie:
+          regex: {{ .Values.header.cookieV1.regex }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+      uri:
+        prefix: {{ print .Values.virtualservice.api.url | quote }}
+    rewrite:
+      uri: {{ print .Values.virtualservice.rewriteapi.url | quote }}
+    route:
+      - destination:
+          host: "{{ .Values.nameDeployment }}.{{ .Release.Namespace }}.svc.cluster.local"
+          port:
+            number: {{ .Values.service.port }}
+          {{- if .Values.virtualservice.api.subset }}
+          subset: {{ .Values.virtualservice.api.subset }}
+        headers:
+          response:
+            add: 
+              x-api-version: {{ .Values.header.v1.exact }}
+          {{- end }}  
+{{- if .Values.virtualservice.canary }}
+{{- if .Values.virtualservice.canary.enabled }}
+  - match:
+{{- if and .Values.header .Values.header.canary .Values.header.cookieCanary }}
+  {{- if or .Values.header.canary.enabled .Values.header.cookieCanary.enabled }}
+    - headers:
+    {{- if .Values.header.canary.enabled }}
+        x-api-version:
+          exact: {{ .Values.header.canary.exact }}
+    {{- end }}
+    {{- if .Values.header.cookieCanary.enabled }}
+        cookie:
+          regex: {{ .Values.header.cookieCanary.regex }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+      uri:
+        prefix: {{ print .Values.virtualservice.canary.url | quote }}
+    rewrite:
+      uri: {{ print .Values.virtualservice.rewritecanary.url | quote }}
+    route:
+      - destination:
+          host: "{{ .Values.nameDeployment }}.{{ .Release.Namespace }}.svc.cluster.local"
+          port:
+            number: {{ .Values.service.port }}
+          subset: {{ .Values.virtualservice.canary.subset }}
+        headers:
+          response:
+            add:
+              x-api-version: {{ .Values.header.canary.exact }}
+{{- end }}
+{{- end }}
+{{- if .Values.virtualservice.canary.enabled }} 
+  - match:
+    - uri:
+        prefix: {{ print .Values.virtualservice.api.url | quote }}
+    rewrite:
+      uri: {{ print .Values.virtualservice.rewriteapi.url | quote }}
+    route:
+      - destination:
+          host: "{{ .Values.nameDeployment }}.{{ .Release.Namespace }}.svc.cluster.local"
+          port:
+            number: {{ .Values.service.port }}
+          {{- if .Values.virtualservice.api.subset }}
+          subset: {{ .Values.virtualservice.api.subset }}
+        headers:
+          response:
+            add: 
+              x-api-version: {{ .Values.header.v1.exact }}
+        weight: {{ .Values.canary.stableWeight }}
+          {{- end }}
+      - destination:
+          host: "{{ .Values.nameDeployment }}.{{ .Release.Namespace }}.svc.cluster.local"
+          port:
+            number: {{ .Values.service.port }}
+          subset: {{ .Values.virtualservice.canary.subset }}
+        headers:
+          response:
+            add:
+              x-api-version: {{ .Values.header.canary.exact }}
+        weight: {{ .Values.canary.canaryWeight }}
+{{- end }}
+{{- if .Values.virtualservice.swagger.enabled }}
+  - match:
+    - uri:
+        prefix: {{ print .Values.virtualservice.swagger.url | quote }}
+    rewrite:
+      uri: /swagger
+    route:
+    - destination:
+        host: "{{ .Values.nameDeployment }}.{{ .Release.Namespace }}.svc.cluster.local"
+        port:
+          number: {{ .Values.service.port }}
+{{- end }}
+{{- end }}
