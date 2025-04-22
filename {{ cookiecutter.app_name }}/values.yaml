@@ -5,7 +5,7 @@ replicaCount: 1
 terminationGracePeriodSeconds: 50
 
 # Mudar para nome da aplicação ex: api-nome-composto ou worker-nome-composto
-nameDeployment: nome-da-aplicacao
+nameDeployment: {{ cookiecutter.app_name }}
 ####
 
 #Versão do deployment
@@ -50,7 +50,7 @@ hosts:
 virtualservice:
    enabled: true
    api:
-     url: /nomedaaplicacao/api
+     url: "/{{ cookiecutter.app_name }}/api"
      subset: v1
    rewriteapi:
      url: /api
@@ -146,7 +146,7 @@ canary:
 
 # Veririficar se a aplicação iniciou corretamente antes de liberar tráfego
 startupProbe:
-  enabled: true
+  enabled: false
   httpGet:
     path: /api/v2/PagueLeve/BuscarPagueLeveRegra?codigoProduto=15496&codigoMedalha=6&codigoFilial=100
     port: 8080
