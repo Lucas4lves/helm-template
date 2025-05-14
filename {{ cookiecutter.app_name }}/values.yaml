@@ -40,12 +40,6 @@ hosts:
 
 #Definição de URL para a API ou WORKER
 
-# URL BASE
- # https://k8s.pmenos.com.br (Produção)
- # https://k8sstg.pmenos.com.br (Staging)
- # https://k8shomo.pmenos.com.br (Dev)
-  
-  #Obs.: rewrite para path local.
 
 virtualservice:
    enabled: true
